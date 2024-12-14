@@ -16,7 +16,7 @@
  * Created by Pablo Baxter (Github: pablobaxter)
  */
 
-package com.frybits.plugins
+package com.frybits.gradle
 
 import com.autonomousapps.DependencyAnalysisPlugin
 import com.autonomousapps.DependencyAnalysisSubExtension

@@ -16,3 +16,13 @@ dependencies {
     implementation(libs.dependency.analysis)
     implementation(libs.vanniktech)
 }
+
+
+gradlePlugin {
+    plugins {
+        create("frybitsLibraryPlugin") {
+            id = "frybits-library"
+            implementationClass = "com.frybits.gradle.FrybitsLibraryPlugin"
+        }
+    }
+}

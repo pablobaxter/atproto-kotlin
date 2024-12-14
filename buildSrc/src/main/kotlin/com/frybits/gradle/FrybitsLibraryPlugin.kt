@@ -16,7 +16,7 @@
  * Created by Pablo Baxter (Github: pablobaxter)
  */
 
-package com.frybits.plugins
+package com.frybits.gradle
 
 import com.vanniktech.maven.publish.MavenPublishPlugin
 import org.gradle.api.Plugin
@@ -27,13 +27,14 @@ import org.jetbrains.dokka.gradle.DokkaMultiModuleTask
 import org.jetbrains.dokka.gradle.DokkaPlugin
 import org.jetbrains.dokka.gradle.DokkaTaskPartial
 import org.jetbrains.dokka.gradle.GradleExternalDocumentationLinkBuilder
-import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformJvmPlugin
+import org.jetbrains.kotlin.gradle.plugin.KotlinMultiplatformPluginWrapper
 import java.net.URI
 
-class FrybitsJvmLibraryPlugin : Plugin<Project> {
+class FrybitsLibraryPlugin : Plugin<Project> {
 
     override fun apply(target: Project) = target.run {
-        apply<KotlinPlatformJvmPlugin>()
+        apply<KotlinMultiplatformPluginWrapper>()
+
         configureCommon()
 
         configureDokka()

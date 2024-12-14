@@ -15,3 +15,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "com.frybits.atproto"
+
+include(":crypto")
