@@ -1,4 +1,4 @@
-package com.frybits.atproto.crypto
+package com.frybits.atproto.crypto.utils
 
 internal val P256_DID_PREFIX = byteArrayOf(0x80.toByte(), 0x24)
 internal val SECP256K1_DID_PREFIX = byteArrayOf(0xe7.toByte(), 0x01)
