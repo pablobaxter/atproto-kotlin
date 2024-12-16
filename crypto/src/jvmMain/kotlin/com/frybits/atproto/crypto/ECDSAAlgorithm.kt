@@ -1,28 +1,24 @@
 package com.frybits.atproto.crypto
 
-import com.frybits.atproto.crypto.utils.BASE58_MULTIBASE_PREFIX
-import com.frybits.atproto.crypto.utils.DID_KEY_PREFIX
-import com.frybits.atproto.crypto.utils.encodeToBase58
+import com.frybits.atproto.crypto.utils.formatDidKey
 import org.bouncycastle.jce.interfaces.ECPrivateKey
 import org.bouncycastle.jce.interfaces.ECPublicKey
+import org.bouncycastle.jce.spec.ECPublicKeySpec
 
 internal class ECDSAAlgorithm internal constructor(
-    name: String,
-    override val jwtAlg: String,
-    private val prefix: ByteArray,
-    private val privateKey: ECPrivateKey?,
-    private val publicKey: ECPublicKey
-): Algorithm(name) {
+    jwtAlg: JWTAlgorithm,
+    private val privateKey: ECPrivateKey
+): Algorithm(jwtAlg) {
 
-    private val key = (prefix + publicKey.q.getEncoded(true)).encodeToBase58()
-
-    override val did: String = "$DID_KEY_PREFIX$BASE58_MULTIBASE_PREFIX$key"
-
-    override suspend fun sign(msg: ByteArray): ByteArray {
-        TODO("Not yet implemented")
+    private val publicKey: ECPublicKey = with(jwtAlg) {
+        val publicKeyPoint = parameter.g.multiply(privateKey.d)
+        val publicKeySpec = ECPublicKeySpec(publicKeyPoint, jwtAlg.parameter)
+        return@with keyFactory.generatePublic(publicKeySpec) as ECPublicKey
     }
 
-    override suspend fun verify(pubDid: String, data: ByteArray, sig: ByteArray): Boolean {
-        TODO("Not yet implemented")
+    override val did: String = jwtAlg.formatDidKey(publicKey.q.getEncoded(true))
+
+    override suspend fun sign(msg: ByteArray): ByteArray {
+        return jwtAlg.sign(privateKey, msg)
     }
 }

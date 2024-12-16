@@ -28,12 +28,15 @@ import org.jetbrains.dokka.gradle.DokkaPlugin
 import org.jetbrains.dokka.gradle.DokkaTaskPartial
 import org.jetbrains.dokka.gradle.GradleExternalDocumentationLinkBuilder
 import org.jetbrains.kotlin.gradle.plugin.KotlinMultiplatformPluginWrapper
+import org.jetbrains.kotlinx.serialization.gradle.SerializationGradleSubplugin
 import java.net.URI
 
 class FrybitsLibraryPlugin : Plugin<Project> {
 
     override fun apply(target: Project) = target.run {
         apply<KotlinMultiplatformPluginWrapper>()
+
+        apply<SerializationGradleSubplugin>()
 
         configureCommon()
 

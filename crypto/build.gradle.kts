@@ -9,6 +9,8 @@ kotlin {
         val jvmMain by getting {
             dependencies {
                 implementation(libs.bouncycastle.bcpkix.jdk18on )
+                implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.kotlin.serialization)
             }
         }
 

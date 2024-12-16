@@ -1,54 +1,50 @@
 package com.frybits.atproto.crypto
 
-import com.frybits.atproto.crypto.utils.P256_DID_PREFIX
-import com.frybits.atproto.crypto.utils.P256_JWT_ALG
-import com.frybits.atproto.crypto.utils.SECP256K1_DID_PREFIX
-import com.frybits.atproto.crypto.utils.SECP256K1_JWT_ALG
 import com.frybits.atproto.crypto.utils.decodeBase58
-import org.bouncycastle.jcajce.util.BCJcaJceHelper
-import org.bouncycastle.jce.ECNamedCurveTable
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.bouncycastle.jce.interfaces.ECPrivateKey
-import org.bouncycastle.jce.interfaces.ECPublicKey
-import org.bouncycastle.jce.spec.ECNamedCurveParameterSpec
 import org.bouncycastle.jce.spec.ECParameterSpec
 import org.bouncycastle.jce.spec.ECPrivateKeySpec
-import org.bouncycastle.jce.spec.ECPublicKeySpec
 import java.math.BigInteger
 
 sealed class Algorithm(
-    val name: String
-) : Didable, Signer, Verifier
+    override val jwtAlg: JWTAlgorithm
+) : Signer {
 
-private val bCJcaJceHelper = BCJcaJceHelper()
+    abstract val did: String
+}
 
-fun P256Algorithm(privateKey: String): Algorithm {
+suspend fun P256Algorithm(privateKey: String): Algorithm {
     return P256Algorithm(privateKey.decodeBase58())
 }
 
-fun P256Algorithm(privateKey: ByteArray): Algorithm {
-    return ECDSAAlgorithm("p256", P256_JWT_ALG, P256_DID_PREFIX, privateKey, ECNamedCurveTable.getParameterSpec("secp256r1"))
+suspend fun P256Algorithm(privateKey: ByteArray): Algorithm {
+    return ECDSAAlgorithm(JWTAlgorithm.ES256, privateKey)
 }
 
 @OptIn(ExperimentalStdlibApi::class)
-fun K256Algorithm(privateKey: String): Algorithm {
+suspend fun K256Algorithm(privateKey: String): Algorithm {
     return K256Algorithm(privateKey.hexToByteArray())
 }
 
-fun K256Algorithm(privateKey: ByteArray): Algorithm {
-    return ECDSAAlgorithm("k256", SECP256K1_JWT_ALG, SECP256K1_DID_PREFIX, privateKey, ECNamedCurveTable.getParameterSpec("secp256k1"))
+suspend fun K256Algorithm(privateKey: ByteArray): Algorithm {
+    return ECDSAAlgorithm(JWTAlgorithm.ES256K, privateKey)
 }
 
-private fun ECDSAAlgorithm(name: String, jwtAlgo: String, prefix: ByteArray, privateKey: ByteArray, parameter: ECNamedCurveParameterSpec): Algorithm {
-    val d = BigInteger(1, privateKey)
-    val curveSpec = ECParameterSpec(parameter.curve, parameter.g, parameter.n, parameter.h)
-    val privateKeySpec = ECPrivateKeySpec(d, curveSpec)
-    val keyFactory = bCJcaJceHelper.createKeyFactory("EC")
-    val privateKey = keyFactory.generatePrivate(privateKeySpec) as ECPrivateKey
+private suspend fun ECDSAAlgorithm(jwtAlgo: JWTAlgorithm, privateKeyArray: ByteArray): Algorithm {
+    return withContext(Dispatchers.Default) {
+        val d = BigInteger(1, privateKeyArray)
 
-    val publicKeyPoint = parameter.g.multiply(d)
-    val publicKeySpec = ECPublicKeySpec(publicKeyPoint, parameter)
+        val curveSpec = ECParameterSpec(
+            jwtAlgo.parameter.curve,
+            jwtAlgo.parameter.g,
+            jwtAlgo.parameter.n,
+            jwtAlgo.parameter.h
+        )
+        val privateKeySpec = ECPrivateKeySpec(d, curveSpec)
+        val privateKey = jwtAlgo.keyFactory.generatePrivate(privateKeySpec) as ECPrivateKey
 
-    val publicKey = keyFactory.generatePublic(publicKeySpec) as ECPublicKey
-
-    return ECDSAAlgorithm(name, jwtAlgo, prefix, privateKey, publicKey)
+        return@withContext ECDSAAlgorithm(jwtAlgo, privateKey)
+    }
 }
