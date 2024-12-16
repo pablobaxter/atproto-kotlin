@@ -1,6 +1,10 @@
 package com.frybits.atproto.crypto.utils
 
-import com.frybits.atproto.crypto.JWTAlgorithm
+import com.frybits.atproto.crypto.Algorithm
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.bouncycastle.jce.spec.ECNamedCurveParameterSpec
+import org.bouncycastle.jce.spec.ECPublicKeySpec
 
 private const val BASE58_MULTIBASE_PREFIX = "z"
 private const val DID_KEY_PREFIX = "did:key:"
@@ -15,22 +19,31 @@ fun String.extractPrefixedBytes(): ByteArray {
     return removePrefix(BASE58_MULTIBASE_PREFIX).decodeBase58()
 }
 
-fun JWTAlgorithm.formatDidKey(keyBytes: ByteArray): String {
+fun Algorithm.formatDidKey(keyBytes: ByteArray): String {
     return "$DID_KEY_PREFIX${formatMultikey(keyBytes)}"
 }
 
-fun JWTAlgorithm.formatMultikey(keyBytes: ByteArray): String {
+fun Algorithm.formatMultikey(keyBytes: ByteArray): String {
     val prefixedBytes = didPrefix + keyBytes
     return "$BASE58_MULTIBASE_PREFIX${prefixedBytes.encodeToBase58()}"
 }
 
-fun String.parseDidKey(): Pair<JWTAlgorithm, ByteArray> {
+fun String.parseDidKey(): Pair<Algorithm, ByteArray> {
     val multiKey = extractMultikey()
     return multiKey.parseMultiKey()
 }
 
-fun String.parseMultiKey(): Pair<JWTAlgorithm, ByteArray> {
+fun String.parseMultiKey(): Pair<Algorithm, ByteArray> {
     val prefixedBytes = extractPrefixedBytes()
-    val algo = JWTAlgorithm.entries.first { it.prefixes(prefixedBytes) }
+    val algo = requireNotNull(Algorithm.entries.firstOrNull { it.prefixes(prefixedBytes) }) {
+        "Unsupported key type"
+    }
     return algo to algo.removePrefix(prefixedBytes)
+}
+
+suspend fun String.verifyDid(data: ByteArray, sig: ByteArray): Boolean {
+    return withContext(Dispatchers.Default) {
+        val (algo, publicKeyBytes) = parseDidKey()
+        return@withContext algo.verify(publicKeyBytes, data, sig)
+    }
 }
