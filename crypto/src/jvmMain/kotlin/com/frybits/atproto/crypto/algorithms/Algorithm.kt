@@ -7,7 +7,6 @@ import kotlinx.coroutines.withContext
 import org.bouncycastle.crypto.CipherParameters
 import org.bouncycastle.crypto.Signer
 import org.bouncycastle.jcajce.util.BCJcaJceHelper
-import org.bouncycastle.jce.spec.ECNamedCurveParameterSpec
 import java.security.KeyFactory
 import java.security.KeyPairGenerator
 import java.security.spec.AlgorithmParameterSpec
