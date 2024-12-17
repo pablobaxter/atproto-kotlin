@@ -4,16 +4,22 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.bouncycastle.crypto.Signer
+import org.bouncycastle.crypto.signers.DSADigestSigner
+import org.bouncycastle.crypto.signers.ECDSASigner
+import org.bouncycastle.crypto.signers.PlainDSAEncoding
+import org.bouncycastle.crypto.util.DigestFactory
+import org.bouncycastle.crypto.util.PrivateKeyFactory
+import org.bouncycastle.crypto.util.PublicKeyFactory
 import org.bouncycastle.jcajce.util.BCJcaJceHelper
 import org.bouncycastle.jce.ECNamedCurveTable
 import org.bouncycastle.jce.spec.ECNamedCurveParameterSpec
 import org.bouncycastle.jce.spec.ECPublicKeySpec
+import java.math.BigInteger
 import java.security.KeyFactory
 import java.security.KeyPairGenerator
 import java.security.PrivateKey
 import java.security.PublicKey
-import java.security.Signature
-import java.security.SignatureException
 import java.security.spec.AlgorithmParameterSpec
 
 private val bCJcaJceHelper = BCJcaJceHelper()
@@ -23,55 +29,131 @@ enum class Algorithm(
     val parameter: AlgorithmParameterSpec,
     val keyFactory: KeyFactory,
     val keyPairGenerator: KeyPairGenerator,
-    private val signature: Signature
+    protected val signature: Signer
 ) {
+
     ES256(
         byteArrayOf(0x80.toByte(), 0x24),
         ECNamedCurveTable.getParameterSpec("secp256r1"),
         bCJcaJceHelper.createKeyFactory("ECDSA"),
         bCJcaJceHelper.createKeyPairGenerator("ECDSA"),
-        bCJcaJceHelper.createSignature("SHA256withECDSA")
-    ),
+        DSADigestSigner(ECDSASigner(), DigestFactory.createSHA256(), PlainDSAEncoding.INSTANCE)
+    ) {
+
+        override suspend fun verify(publicKeyBytes: ByteArray, data: ByteArray, sig: ByteArray): Boolean {
+            return verify(publicKeyBytes, data, sig, true)
+        }
+
+        suspend fun verify(publicKeyBytes: ByteArray, data: ByteArray, sig: ByteArray, useLowS: Boolean): Boolean {
+            return withContext(Dispatchers.Default) {
+                require(parameter is ECNamedCurveParameterSpec)
+                val point = parameter.curve.decodePoint(publicKeyBytes)
+                val publicKeySpec = ECPublicKeySpec(point, parameter)
+                val publicKey = keyFactory.generatePublic(publicKeySpec)
+                return@withContext verify(publicKey, data, sig, useLowS)
+            }
+        }
+
+        override suspend fun verify(publicKey: PublicKey, data: ByteArray, sig: ByteArray): Boolean {
+            return verify(publicKey, data, sig, true)
+        }
+
+        suspend fun verify(publicKey: PublicKey, data: ByteArray, sig: ByteArray, useLowS: Boolean): Boolean {
+            if (useLowS) {
+                require(parameter is ECNamedCurveParameterSpec)
+                val s = BigInteger(1, sig, 32, 32)
+                if (s > parameter.curve.order.shiftRight(1)) {
+                    return false
+                }
+            }
+            return super.verify(publicKey, data, sig)
+        }
+    },
+
     ES256K(
         byteArrayOf(0xE7.toByte(), 0x01),
         ECNamedCurveTable.getParameterSpec("secp256k1"),
         bCJcaJceHelper.createKeyFactory("ECDSA"),
         bCJcaJceHelper.createKeyPairGenerator("ECDSA"),
-        bCJcaJceHelper.createSignature("SHA256withECDSA")
-    );
+        DSADigestSigner(ECDSASigner(), DigestFactory.createSHA256(), PlainDSAEncoding.INSTANCE)
+    ) {
 
-    private val mutex = Mutex()
+        override suspend fun verify(publicKeyBytes: ByteArray, data: ByteArray, sig: ByteArray): Boolean {
+            return verify(publicKeyBytes, data, sig, true)
+        }
+
+        suspend fun verify(publicKeyBytes: ByteArray, data: ByteArray, sig: ByteArray, useLowS: Boolean): Boolean {
+            return withContext(Dispatchers.Default) {
+                require(parameter is ECNamedCurveParameterSpec)
+                val point = parameter.curve.decodePoint(publicKeyBytes)
+                val publicKeySpec = ECPublicKeySpec(point, parameter)
+                val publicKey = keyFactory.generatePublic(publicKeySpec)
+                return@withContext verify(publicKey, data, sig, useLowS)
+            }
+        }
+
+        override suspend fun verify(publicKey: PublicKey, data: ByteArray, sig: ByteArray): Boolean {
+            return verify(publicKey, data, sig, true)
+        }
+
+        suspend fun verify(publicKey: PublicKey, data: ByteArray, sig: ByteArray, useLowS: Boolean): Boolean {
+            if (useLowS) {
+                require(parameter is ECNamedCurveParameterSpec)
+                val s = BigInteger(1, sig, 32, 32)
+                if (s > parameter.curve.order.shiftRight(1)) {
+                    return false
+                }
+            }
+            return super.verify(publicKey, data, sig)
+        }
+
+        override suspend fun sign(privateKey: PrivateKey, msg: ByteArray): ByteArray {
+            return sign(privateKey, msg, true)
+        }
+
+        suspend fun sign(privateKey: PrivateKey, msg: ByteArray, useLowS: Boolean): ByteArray {
+            val sig = super.sign(privateKey, msg)
+            if (useLowS) {
+                require(parameter is ECNamedCurveParameterSpec)
+                var s = BigInteger(1, sig, 32, 32)
+
+                if (s > parameter.curve.order.shiftRight(1)) {
+                    s = parameter.curve.order.subtract(s)
+                }
+
+                val sBA = s.toByteArray()
+                repeat(32) { i ->
+                    sig[32 + i] = sBA[i]
+                }
+            }
+            return sig
+        }
+    };
+
+    protected val mutex = Mutex()
 
     init {
         keyPairGenerator.initialize(parameter)
     }
 
-    internal suspend fun sign(privateKey: PrivateKey, msg: ByteArray): ByteArray {
+    abstract suspend fun verify(publicKeyBytes: ByteArray, data: ByteArray, sig: ByteArray): Boolean
+
+    open suspend fun verify(publicKey: PublicKey, data: ByteArray, sig: ByteArray): Boolean {
         return withContext(Dispatchers.Default) {
             return@withContext mutex.withLock {
-                signature.initSign(privateKey)
-                signature.update(msg)
-                return@withLock signature.sign()
+                signature.init(false, PublicKeyFactory.createKey(publicKey.encoded))
+                signature.update(data, 0, data.size)
+                return@withLock signature.verifySignature(sig)
             }
         }
     }
 
-    internal suspend fun verify(publicKeyBytes: ByteArray, data: ByteArray, sig: ByteArray): Boolean {
-        return withContext(Dispatchers.Default) {
-            require(parameter is ECNamedCurveParameterSpec)
-            val point = parameter.curve.decodePoint(publicKeyBytes)
-            val publicKeySpec = ECPublicKeySpec(point, parameter)
-            val publicKey = keyFactory.generatePublic(publicKeySpec)
-            return@withContext verify(publicKey, data, sig)
-        }
-    }
-
-    internal suspend fun verify(publicKey: PublicKey, data: ByteArray, sig: ByteArray): Boolean {
+    open suspend fun sign(privateKey: PrivateKey, msg: ByteArray): ByteArray {
         return withContext(Dispatchers.Default) {
             return@withContext mutex.withLock {
-                signature.initVerify(publicKey)
-                signature.update(data)
-                return@withLock signature.verify(sig)
+                signature.init(true, PrivateKeyFactory.createKey(privateKey.encoded))
+                signature.update(msg, 0, msg.size)
+                return@withLock signature.generateSignature()
             }
         }
     }

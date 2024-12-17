@@ -3,8 +3,6 @@ package com.frybits.atproto.crypto.utils
 import com.frybits.atproto.crypto.Algorithm
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.bouncycastle.jce.spec.ECNamedCurveParameterSpec
-import org.bouncycastle.jce.spec.ECPublicKeySpec
 
 private const val BASE58_MULTIBASE_PREFIX = "z"
 private const val DID_KEY_PREFIX = "did:key:"
@@ -41,7 +39,7 @@ fun String.parseMultiKey(): Pair<Algorithm, ByteArray> {
     return algo to algo.removePrefix(prefixedBytes)
 }
 
-suspend fun String.verifyDid(data: ByteArray, sig: ByteArray): Boolean {
+suspend fun String.verifyDid(data: ByteArray, sig: ByteArray, useLowS: Boolean = false): Boolean {
     return withContext(Dispatchers.Default) {
         val (algo, publicKeyBytes) = parseDidKey()
         return@withContext algo.verify(publicKeyBytes, data, sig)

@@ -1,5 +1,6 @@
 package com.frybits.atproto.crypto
 
+import com.frybits.atproto.crypto.utils.TestVector
 import com.frybits.atproto.crypto.utils.extractPrefixedBytes
 import com.frybits.atproto.crypto.utils.parseDidKey
 import kotlinx.coroutines.runBlocking
@@ -20,29 +21,28 @@ class SignaturesTest {
     private val resource = requireNotNull(this::class.java.classLoader.getResource("signature-fixtures.json"))
     @OptIn(ExperimentalSerializationApi::class)
     private val vectors = resource.openStream().use {
-        Json.decodeFromStream<JsonArray>(it)
+        Json {
+            ignoreUnknownKeys = true
+        }.decodeFromStream<List<TestVector>>(it)
     }
 
     @OptIn(ExperimentalStdlibApi::class, ExperimentalEncodingApi::class)
     @Test
     fun `verifies secp256k1 and P-256 test vectors`() = runBlocking {
         vectors.forEach { vector ->
-            val json = vector.jsonObject
             val decoder = Base64.withPadding(Base64.PaddingOption.ABSENT)
-            val messageBytes = decoder.decode(requireNotNull(json["messageBase64"]?.jsonPrimitive?.content))
-            val signatureBytes = decoder.decode(requireNotNull(json["signatureBase64"]?.jsonPrimitive?.content))
+            val messageBytes = decoder.decode(vector.messageBase64)
+            val signatureBytes = decoder.decode(vector.signatureBase64)
 
-            val keyBytes = requireNotNull(json["publicKeyMultibase"]?.jsonPrimitive?.content).extractPrefixedBytes()
+            val keyBytes = vector.publicKeyMultibase.extractPrefixedBytes()
 
-            val didKey = requireNotNull(json["publicKeyDid"]?.jsonPrimitive?.content).parseDidKey()
+            val didKey = vector.publicKeyDid.parseDidKey()
 
             assertContentEquals(keyBytes, didKey.second)
 
-            if (json["algorithm"]?.jsonPrimitive?.content == Algorithm.ES256.name) {
-                val verified = Algorithm.ES256.verify(keyBytes, messageBytes, signatureBytes)
-                println(json["validSignature"])
-                assertEquals(json["validSignature"]?.jsonPrimitive?.content.toBoolean(), verified)
-            }
+            val algo = Algorithm.valueOf(vector.algorithm)
+            val verified = algo.verify(keyBytes, messageBytes, signatureBytes)
+            assertEquals(vector.validSignature, verified)
         }
     }
 }
