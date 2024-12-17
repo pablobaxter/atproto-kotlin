@@ -1,6 +1,9 @@
 package com.frybits.atproto.crypto.utils
 
-import com.frybits.atproto.crypto.Algorithm
+import com.frybits.atproto.crypto.algorithms.Algorithm
+import com.frybits.atproto.crypto.algorithms.ES256
+import com.frybits.atproto.crypto.algorithms.ES256K
+import com.frybits.atproto.crypto.algorithms.EllipticCurveAlgorithm
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -26,15 +29,17 @@ fun Algorithm.formatMultikey(keyBytes: ByteArray): String {
     return "$BASE58_MULTIBASE_PREFIX${prefixedBytes.encodeToBase58()}"
 }
 
-fun String.parseDidKey(): Pair<Algorithm, ByteArray> {
+fun String.parseDidKey(): Pair<EllipticCurveAlgorithm, ByteArray> {
     val multiKey = extractMultikey()
     return multiKey.parseMultiKey()
 }
 
-fun String.parseMultiKey(): Pair<Algorithm, ByteArray> {
+fun String.parseMultiKey(): Pair<EllipticCurveAlgorithm, ByteArray> {
     val prefixedBytes = extractPrefixedBytes()
-    val algo = requireNotNull(Algorithm.entries.firstOrNull { it.prefixes(prefixedBytes) }) {
-        "Unsupported key type"
+    val algo = when {
+        ES256.prefixes(prefixedBytes) -> ES256
+        ES256K.prefixes(prefixedBytes) -> ES256K
+        else -> throw IllegalArgumentException("Unsupported key type")
     }
     return algo to algo.removePrefix(prefixedBytes)
 }
@@ -42,6 +47,6 @@ fun String.parseMultiKey(): Pair<Algorithm, ByteArray> {
 suspend fun String.verifyDid(data: ByteArray, sig: ByteArray, useLowS: Boolean = false): Boolean {
     return withContext(Dispatchers.Default) {
         val (algo, publicKeyBytes) = parseDidKey()
-        return@withContext algo.verify(publicKeyBytes, data, sig)
+        return@withContext algo.verify(publicKeyBytes, data, sig, useLowS)
     }
 }

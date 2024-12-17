@@ -1,5 +1,7 @@
 package com.frybits.atproto.crypto
 
+import com.frybits.atproto.crypto.algorithms.ES256
+import com.frybits.atproto.crypto.algorithms.ES256K
 import com.frybits.atproto.crypto.utils.formatDidKey
 import com.frybits.atproto.crypto.utils.parseDidKey
 import kotlinx.coroutines.runBlocking
@@ -42,11 +44,11 @@ class DidTest {
             val id = it["publicDidKey"] ?: fail()
 
             val keyPair = K256KeyPair(seed) as ECDSAKeyPair
-            val generatedDid = Algorithm.ES256K.formatDidKey(keyPair.publicKey.q.getEncoded(true))
+            val generatedDid = ES256K.formatDidKey(keyPair.publicKeyParam.q.getEncoded(true))
             assertEquals(id, generatedDid)
             val (algo, bytes) = generatedDid.parseDidKey()
-            assertEquals(Algorithm.ES256K, algo)
-            assertContentEquals(bytes, keyPair.publicKey.q.getEncoded(true))
+            assertEquals(ES256K, algo)
+            assertContentEquals(bytes, keyPair.publicKeyParam.q.getEncoded(true))
         }
     }
 
@@ -68,11 +70,11 @@ class DidTest {
             val id = vector["publicDidKey"] ?: fail()
 
             val keyPair = P256KeyPair(key) as ECDSAKeyPair
-            val generatedDid = Algorithm.ES256.formatDidKey(keyPair.publicKey.q.getEncoded(true))
+            val generatedDid = ES256.formatDidKey(keyPair.publicKeyParam.q.getEncoded(true))
             assertEquals(id, generatedDid)
             val (algo, bytes) = generatedDid.parseDidKey()
-            assertEquals(Algorithm.ES256, algo)
-            assertContentEquals(bytes, keyPair.publicKey.q.getEncoded(true))
+            assertEquals(ES256, algo)
+            assertContentEquals(bytes, keyPair.publicKeyParam.q.getEncoded(true))
         }
     }
 }

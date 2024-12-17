@@ -1,20 +1,20 @@
 package com.frybits.atproto.crypto
 
+import com.frybits.atproto.crypto.algorithms.ES256
+import com.frybits.atproto.crypto.algorithms.ES256K
 import com.frybits.atproto.crypto.utils.TestVector
 import com.frybits.atproto.crypto.utils.extractPrefixedBytes
 import com.frybits.atproto.crypto.utils.parseDidKey
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.decodeFromStream
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.fail
 
 class SignaturesTest {
 
@@ -40,7 +40,11 @@ class SignaturesTest {
 
             assertContentEquals(keyBytes, didKey.second)
 
-            val algo = Algorithm.valueOf(vector.algorithm)
+            val algo = when (vector.algorithm) {
+                ES256::class.java.simpleName -> ES256
+                ES256K::class.java.simpleName -> ES256K
+                else -> fail()
+            }
             val verified = algo.verify(keyBytes, messageBytes, signatureBytes)
             assertEquals(vector.validSignature, verified)
         }
