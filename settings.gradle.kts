@@ -17,3 +17,6 @@ dependencyResolutionManagement {
 rootProject.name = "com.frybits.atproto"
 
 include(":crypto")
+include(":identity")
+include(":common")
+include(":did")

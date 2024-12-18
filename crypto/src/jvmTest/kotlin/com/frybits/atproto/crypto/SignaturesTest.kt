@@ -51,6 +51,8 @@ class SignaturesTest {
             }
             val verified = algo.verify(keyBytes, messageBytes, signatureBytes)
             assertEquals(vector.validSignature, verified)
+
+
         }
     }
 
